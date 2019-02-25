@@ -34,7 +34,7 @@ MODFILES := $(notdir $(patsubst %.f90,%.o,$(F90_MODULE_SOURCES)))
 all: $(MODFILES)
 
 %.o : %.f90
-	$(FC) -c $(FCOPTIONS) $<
+	$(FC) -c $(FCOPTIONS) -llapack $<
 
 clean:
 	rm -f *~ *.o *.mod
