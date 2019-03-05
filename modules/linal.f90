@@ -641,6 +641,8 @@ CONTAINS
 
     !! Finds the LU factorization of a given square matrix.
     !!
+    !! Depends on LAPACK.
+    !! 
     !! Input:  - Square matrix              A2LU(n,n)
     !! Output: - LU factorization           A2LU(n,n)
     !!         - Index vector               indx(n)
@@ -651,60 +653,16 @@ CONTAINS
     INTEGER, DIMENSION(SIZE(A2LU,dim=1)), INTENT(out) :: indx
     CHARACTER(len=*), INTENT(inout)                            :: error
 
-    REAL(rprec8), DIMENSION(:), ALLOCATABLE :: vv, helpvec
-    INTEGER :: n, i, imax, err
+    INTEGER :: n, err
+
+    EXTERNAL DGETRF ! Lapack LU factorization function
 
     n = SIZE(A2LU,dim=1)
-    ALLOCATE(vv(SIZE(indx)), helpvec(SIZE(indx)), stat=err)
+    CALL DGETRF(n, n, A2LU, n, indx, err)
+    
     IF (err /= 0) THEN
-       error = " -> linal : LU_factor : Could not allocate memory." // &
+       error = " -> linal : LU_factor : Matrix is numerically singular!" // &
             TRIM(error)
-       DEALLOCATE(vv, stat=err)
-       DEALLOCATE(helpvec, stat=err)
-       RETURN
-    END IF
-
-    ! Find scaling factor for each row so that the maximum 
-    ! element of the row is equal to one:
-    vv = MAXVAL(ABS(A2LU),dim=2)
-    IF (MINVAL(vv) < 1.0e-32_rprec8*EPSILON(vv)) THEN
-       error = " -> linal : LU_factor : Maximum element of a row too small." // &
-            TRIM(error)
-       DEALLOCATE(vv, stat=err)
-       DEALLOCATE(helpvec, stat=err)
-       RETURN
-    ELSE
-       vv = 1.0_rprec8 / vv
-    END IF
-
-    DO i=1,n
-       imax = (i-1) + imaxloc(vv(i:n)*ABS(A2LU(i:n,i)))
-       IF (i /= imax) THEN
-          helpvec = A2LU(imax,1:n)
-          A2LU(imax,1:n) = A2LU(i,1:n)
-          A2LU(i,1:n) = helpvec
-          vv(imax) = vv(i)
-       END IF
-       indx(i) = imax
-       ! Avoid division with zero:
-       IF (ABS(A2LU(i,i)) < 1.0e-32_rprec8*EPSILON(A2LU(i,i))) THEN
-          error = " -> linal : LU_factor : Division by almost zero." // &
-               TRIM(error)
-          DEALLOCATE(vv, stat=err)
-          DEALLOCATE(helpvec, stat=err)
-          RETURN
-       END IF
-       A2LU(i+1:n,i) = A2LU(i+1:n,i) / A2LU(i,i)
-       A2LU(i+1:n,i+1:n) = A2LU(i+1:n,i+1:n) - &
-            outer_product(A2LU(i+1:n,i),A2LU(i,i+1:n))
-    END DO
-
-    DEALLOCATE(vv, helpvec, stat=err)
-    IF (err /= 0) THEN
-       error = " -> linal : LU_factor : Could not deallocate memory." // &
-            TRIM(error)
-       DEALLOCATE(vv, stat=err)
-       DEALLOCATE(helpvec, stat=err)
        RETURN
     END IF
 
@@ -717,6 +675,8 @@ CONTAINS
   SUBROUTINE LU_factor_r16(A2LU, indx, error)
 
     !! Finds the LU factorization of a given square matrix.
+    !!
+    !! Does not currently use LAPACK (which lacks quad precision functions?)
     !!
     !! Input:  - Square matrix              A2LU(n,n)
     !! Output: - LU factorization           A2LU(n,n)
@@ -734,56 +694,57 @@ CONTAINS
     n = SIZE(A2LU,dim=1)
     ALLOCATE(vv(SIZE(indx)), helpvec(SIZE(indx)), stat=err)
     IF (err /= 0) THEN
-       error = " -> linal : LU_factor : Could not allocate memory." // &
-            TRIM(error)
-       DEALLOCATE(vv, stat=err)
-       DEALLOCATE(helpvec, stat=err)
-       RETURN
+      error = " -> linal : LU_factor : Could not allocate memory." // &
+       TRIM(error)
+      DEALLOCATE(vv, stat=err)
+      DEALLOCATE(helpvec, stat=err)
+      RETURN
     END IF
 
-    ! Find scaling factor for each row so that the maximum 
+    ! Find scaling factor for each row so that the maximum
     ! element of the row is equal to one:
     vv = MAXVAL(ABS(A2LU),dim=2)
     IF (MINVAL(vv) < 1.0e-32_rprec16*EPSILON(vv)) THEN
-       error = " -> linal : LU_factor : Maximum element of a row too small." // &
-            TRIM(error)
-       DEALLOCATE(vv, stat=err)
-       DEALLOCATE(helpvec, stat=err)
-       RETURN
+      error = " -> linal : LU_factor : Maximum element of a row too small." // &
+&       TRIM(error)
+      DEALLOCATE(vv, stat=err)
+      DEALLOCATE(helpvec, stat=err)
+      RETURN
     ELSE
-       vv = 1.0_rprec16 / vv
+      vv = 1.0_rprec16 / vv
     END IF
 
     DO i=1,n
-       imax = (i-1) + imaxloc(vv(i:n)*ABS(A2LU(i:n,i)))
-       IF (i /= imax) THEN
+      imax = (i-1) + imaxloc(vv(i:n)*ABS(A2LU(i:n,i)))
+      IF (i /= imax) THEN
           helpvec = A2LU(imax,1:n)
           A2LU(imax,1:n) = A2LU(i,1:n)
           A2LU(i,1:n) = helpvec
           vv(imax) = vv(i)
-       END IF
-       indx(i) = imax
-       ! Avoid division with zero:
-       IF (ABS(A2LU(i,i)) < 1.0e-32_rprec16*EPSILON(A2LU(i,i))) THEN
-          error = " -> linal : LU_factor : Division by almost zero." // &
-               TRIM(error)
-          DEALLOCATE(vv, stat=err)
-          DEALLOCATE(helpvec, stat=err)
-          RETURN
-       END IF
-       A2LU(i+1:n,i) = A2LU(i+1:n,i) / A2LU(i,i)
-       A2LU(i+1:n,i+1:n) = A2LU(i+1:n,i+1:n) - &
-            outer_product(A2LU(i+1:n,i),A2LU(i,i+1:n))
+        END IF
+      indx(i) = imax
+      ! Avoid division with zero:
+      IF (ABS(A2LU(i,i)) < 1.0e-32_rprec16*EPSILON(A2LU(i,i))) THEN
+        error = " -> linal : LU_factor : Division by almost zero." // &
+         TRIM(error)
+        DEALLOCATE(vv, stat=err)
+        DEALLOCATE(helpvec, stat=err)
+        RETURN
+      END IF
+      A2LU(i+1:n,i) = A2LU(i+1:n,i) / A2LU(i,i)
+      A2LU(i+1:n,i+1:n) = A2LU(i+1:n,i+1:n) - &
+       outer_product(A2LU(i+1:n,i),A2LU(i,i+1:n))
     END DO
 
     DEALLOCATE(vv, helpvec, stat=err)
     IF (err /= 0) THEN
-       error = " -> linal : LU_factor : Could not deallocate memory." // &
-            TRIM(error)
-       DEALLOCATE(vv, stat=err)
-       DEALLOCATE(helpvec, stat=err)
-       RETURN
+      error = " -> linal : LU_factor : Could not deallocate memory." // &
+       TRIM(error)
+      DEALLOCATE(vv, stat=err)
+      DEALLOCATE(helpvec, stat=err)
+      RETURN
     END IF
+    
 
   END SUBROUTINE LU_factor_r16
 
@@ -924,6 +885,8 @@ CONTAINS
 
     !! Returns the inverse of square matrix A using either the LU
     !! factorization algorithm or the Cholesky decomposition algorithm
+    !!
+    !! Depends on LAPACK.
     !! 
     !! Input:   - Square matrix              A(n,n)
     !!          - Inverse square matrix      inv_A(n,n)
@@ -939,7 +902,10 @@ CONTAINS
     REAL(rprec8), DIMENSION(:,:), ALLOCATABLE :: LU, L
     REAL(rprec8), DIMENSION(:), ALLOCATABLE :: p
     INTEGER, DIMENSION(:), ALLOCATABLE :: indx
+    REAL(rprec8), dimension(size(A,1)) :: work  ! work array for LAPACK
     INTEGER :: i, n, err
+
+    EXTERNAL DGETRI
 
     n = SIZE(A,dim=1)
     IF (n /= SIZE(A,dim=2)) THEN
@@ -954,9 +920,7 @@ CONTAINS
     ELSE
        method_ = "LU"
     END IF
-
     IF (method_ == "LU") THEN
-
        ALLOCATE(LU(n,n), indx(n), stat=err)
        IF (err /= 0) THEN
           error = " -> linal : matinv : Could not allocate memory." // &
@@ -969,24 +933,31 @@ CONTAINS
        ! A => LU :
        LU(:,:) = A(:,:)
        CALL LU_factor(LU(:,:), indx, error)
+       ! FIXME: there's something wrong here
        IF (LEN_TRIM(error) /= 0) THEN
           error = " -> linal : matinv : LU factorization unsuccessful." // &
                TRIM(error)
-          DEALLOCATE(LU, stat=err)
-          DEALLOCATE(indx, stat=err)
-          RETURN
+   !       DEALLOCATE(LU, stat=err)
+   !       DEALLOCATE(indx, stat=err)
+               !       RETURN
+!        write(0,*) "error:", error
        END IF
 
        ! Initialize the identity matrix:
        matinv_r8(:,:) = 0.0_rprec8
+      
        FORALL(i=1:n)
           matinv_r8(i,i) = 1.0_rprec8
-       END FORALL
-
+        END FORALL
+        
+       ! DGETRI computes the inverse of a matrix using the LU factorization
+       ! computed by DGETRF (within LU_factor)
+       CALL DGETRI(n, LU, n, indx, work, n, err)
+       matinv_r8 = LU
        ! Solve b from LUb = e_i and put A(:,i) = b:
-       DO i=1,n
-          CALL LU_solve(LU, indx, matinv_r8(1:n,i))
-       END DO
+!       DO i=1,n
+!          CALL LU_solve(LU, indx, matinv_r8(1:n,i))
+!       END DO
 
        DEALLOCATE(LU, indx, stat=err)
        IF (err /= 0) THEN
