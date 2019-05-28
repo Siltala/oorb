@@ -3143,7 +3143,7 @@ CONTAINS
          gaiaVelZTrs, trsResult, collPos, collVel
     REAL(bp), DIMENSION(10,15) :: transitTmp
     REAL(bp), DIMENSION(6,6) :: covariance, covariance_sys, covariance_final
-    REAL(bp), DIMENSION(6) :: coordinates, stdev_, mean
+    REAL(bp), DIMENSION(6) :: coordinates, coordinates_final, stdev_, mean
     REAL(bp), DIMENSION(3) :: position, velocity, pos1, pos2, &
                               midGaia, midGaiaV, position_final
     REAL(bp) :: day, sec, arcsec, mag, ra, dec, jd, mjd, dt, &
@@ -5087,10 +5087,10 @@ end if
                  
                  dt= trsResult(7)
                  
-                 coordinates(1:3)=midGaia
-                 coordinates(4:6)=midGaiaV
+                 coordinates_final(1:3)=midGaia
+                 coordinates_final(4:6)=midGaiaV
                  
-                 
+                 write(0,*) "Collapsed Gaia coordinates:", coordinates_final
                  ! add observation
                  
                                i = i + 1
@@ -5126,7 +5126,7 @@ end if
                           "TRACE BACK (122)", 1)
                      RETURN
                   END IF
-                  CALL NEW(obsy_ccoord, coordinates + planeph(1,:), "equatorial", t)
+                  CALL NEW(obsy_ccoord, coordinates_final + planeph(1,:), "equatorial", t)
                   IF (error) THEN
                      CALL errorMessage("Observations / readObservationFile", &
                           "TRACE BACK (125)", 1)
@@ -5142,7 +5142,7 @@ end if
                   satellite_ccoord = getObservatoryCCoord(obsies, "500", t)
                   CALL rotateToEquatorial(satellite_ccoord)
                   CALL rotateToEquatorial(obsy_ccoord)
-                  coordinates = getCoordinates(obsy_ccoord) - getCoordinates(satellite_ccoord)
+                  coordinates_final = getCoordinates(obsy_ccoord) - getCoordinates(satellite_ccoord)
                   CALL NULLIFY(satellite_ccoord)
                   CALL NEW(satellite_ccoord, coordinates, "equatorial", t)
                   CALL NULLIFY(this%obs_arr(numberOfTransits))
