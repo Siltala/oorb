@@ -3161,7 +3161,7 @@ CONTAINS
          transitCounter, transitCounterAfter, &
          numberOfTransits, finalNumberOfTransits, linecounter, sot, s
     LOGICAL, DIMENSION(6) :: obs_mask
-    LOGICAL :: discovery, converttonewformat, newtransit, transit_ok, init, fulltransitdone
+    LOGICAL :: discovery, converttonewformat, newtransit, transit_ok, init, fulltransitdone, completed
 
     converttonewformat = .FALSE.
 
@@ -4856,6 +4856,7 @@ CONTAINS
 
        CASE ("gdr2np")
        ! Gaia DR2 format with normal points
+           completed = .FALSE.
            newtransit = .FALSE.
            fulltransitdone = .FALSE.
            covariance = 0.0_bp
@@ -4895,21 +4896,35 @@ CONTAINS
           last_epoch = 0
           init = .TRUE.
           transit_ok = .FALSE.
-          transitCounter = 1
+          transitCounter = 0
            DO ! This should go over the file, line-by-line.
-              
+              if (completed) then 
+                exit 
+              end if 
+              if (.NOT. fulltransitdone) then 
               READ(getUnit(obsf), "(A)", iostat=err) line
               linecounter=linecounter+1
+              end if 
 
-              IF (err > 0) THEN ! Error handling.
-              error = .TRUE.
-              CALL errorMessage("Observations / readObservationFile", &
-                   "Error while reading observations from file (1).", 1)
-              RETURN
-           ELSE IF (err < 0) THEN ! End of file
-              EXIT
-  end if 
-              IF (info_verb >= 2) THEN
+           IF (err < 0) THEN ! End of file. We have to wait for the final transit to be analyzed or it gets lost!
+           write(0,*) "EOF reached."
+           if (completed) THEN 
+           exit
+            end if 
+              completed = .TRUE.       
+!  end if 
+else IF ((err > 0)) THEN ! Error handling.
+  write(0, *) "err > 0!"
+  if (completed) THEN 
+   EXIT
+else
+  error = .TRUE.
+  CALL errorMessage("Observations / readObservationFile", &
+       "Error while reading observations from file (1).", 1)
+  RETURN
+end if 
+      END IF   
+      IF (info_verb >= 2) THEN
               WRITE(stdout,*) "LC: ", linecounter, "NT: ", numberOfTransits, &
                          "TC: ", transitCounter, "TCA: ", transitCounterAfter
               END IF
@@ -4921,7 +4936,7 @@ CONTAINS
               ! 5. An actual data line!           --> read into temporary array
               ! 6. An end separator               --> collapseTransit, clear temporary array, add to observations, exit sequence
               ! 
-              if (.NOT. fulltransitdone) then ! We -don't- want to read the file just after a transit gets collapsed - otherwise we lose a data point!
+              if ((.NOT. fulltransitdone) .AND. (.NOT. completed)) then ! We -don't- want to read the file just after a transit gets collapsed - otherwise we lose a data point!
               READ(line, *, iostat=err) solution_id, source_id, &
               observation_id, number, epoch, epoch_err, epoch_utc, &
               position(2), position(3), covariance_sys(2,2), &
@@ -4929,20 +4944,32 @@ CONTAINS
               covariance(2,2), covariance(3,3), covariance(2,3), &
               g_mag, g_flux, g_flux_err, coordinates(1:6), &
               position_angle_scan, level_of_confidence
+              write(0, *) "Reading..."
               else
                 write(0,*) "Not reading..."
+                last_epoch = epoch
 
           !      transit_ok = .FALSE.
               end if
               IF (init) THEN
+              last_epoch = epoch
             !  if (last_epoch == 0) THEN
-                last_epoch = epoch
             !else
-              
+     !         write()
            ! end if
               init = .FALSE.
               transit_ok = .FALSE.
               END IF 
+              newtransit = .FALSE.
+              write(0, *) "epoch:", epoch
+
+              write(0,*) "epoch differnce:", ABS(last_epoch - epoch)
+
+              IF (ABS(last_epoch - epoch) < 0.01 .AND. (.NOT. completed)) THEN ! This means no new transit. Is this check good enough?
+              transitCounter = transitCounter + 1
+            !end if 
+              write(0, *) "adding data to transitCounter:", transitCounter
+              write(0, *) "Incremented transit. Now at", transitCounter
               ! Adding the relevant data to the arrays..
               inratrs(transitCounter) = position(2)*rad_deg
               indectrs(transitCounter) = position(3)*rad_deg
@@ -4953,9 +4980,10 @@ CONTAINS
               gaiaVelXTrs(transitCounter) = coordinates(4)
               gaiaVelYTrs(transitCounter) = coordinates(5)
               gaiaVelZTrs(transitCounter) = coordinates(6)
+            end if
               write(0, *) covariance(2:3,2:3)
-              if (.NOT. fulltransitdone) then ! If we haven't read a new line, this will get messed up without the if conditional.
-
+               if ((.NOT. fulltransitdone) .and. (.NOT. completed)) then ! If we haven't read a new line, this will get messed up without the if conditional.
+              write(0,*) "Covariance update.."
               covariance(2,3) = covariance(2,3) * &
               covariance(2,2) * covariance(3,3)
               ! Copy covariance to the other off-diagonal element
@@ -4982,30 +5010,32 @@ CONTAINS
      ! radians^2
      covariance_sys(2:3,2:3) = covariance_sys(2:3,2:3) * &
           (rad_asec/1000.0_bp)**2
+
               end if
               fulltransitdone = .FALSE.
-              write(0,*) covariance(2:3,2:3)
+              IF (ABS(last_epoch - epoch) < 0.01) THEN
+              write(0,*) "covariances:", covariance(2:3,2:3)
               covRandomTrs(1,1,transitCounter) = covariance(2,2) ! 3
               covRandomTrs(2,2,transitCounter) = covariance(3,3) ! 6
               covRandomTrs(1,2,transitCounter) = covariance(2,3)
               covRandomTrs(2,1,transitCounter) = covariance(3,2)
-
+            !f  write(0,*) "covRandomTrs:", covRandomTrs
         !      IF (newtransit) THEN ! Last transit processed, starting new one. Is this a good idea as is???
 
 !                 CYCLE 
-               write(0,*) ABS(last_epoch - epoch)
-              IF (ABS(last_epoch - epoch) > 0.001) THEN ! This means a new transit. Is this check good enough?
+
+
+            end if
+              IF (ABS(last_epoch - epoch) > 0.01 .OR. (completed)) THEN ! This means a new transit. Is this check good enough?
               write(0, *) "If clause triggered. Transit ends at"
               write(0, *) "transitcounter", transitCounter
-              write(0, *) "subtracting one."
-              transitCounter = transitCounter - 1
+           !   write(0, *) "subtracting one."
+           !   transitCounter = transitCounter - 1
                !  transit_ok = .TRUE.                                               ! Makes sure there are no more than 9 per transit and their times are close.
                  transit_ok = .TRUE.
               ELSE IF (transitCounter == 9) THEN
                  transit_ok = .TRUE.
-              ELSE
-              transitCounter = transitCounter + 1
-              write(0, *) "Incremented transit. Now at", transitCounter
+            !  ELSE
               END IF
               last_epoch = epoch
               IF (transit_ok) THEN
@@ -5090,7 +5120,7 @@ end if
                  coordinates_final(1:3)=midGaia
                  coordinates_final(4:6)=midGaiaV
                  
-                 write(0,*) "Collapsed Gaia coordinates:", coordinates_final
+                ! write(0,*) "Collapsed Gaia coordinates:", coordinates_final
                  ! add observation
                  
                                i = i + 1
@@ -5148,7 +5178,7 @@ end if
                   CALL NULLIFY(this%obs_arr(numberOfTransits))
                   ! At this point, we should have everything we need to perform the collapsing of the transit
                   
-                  
+                  newtransit = .TRUE.
                   CALL NEW(this%obs_arr(numberOfTransits), number=number, designation=" ", &
                        discovery=discovery, note1=" ", note2="S", &
                        obs_scoord=obs_scoord, covariance=covariance_final, &
@@ -5177,7 +5207,7 @@ end if
                  
                  ! clear temporary  array
                  transitCounterAfter=1
-                 transitCounter=1
+                 transitCounter=0
                  transitTmp=0.0_bp
                  last_epoch = epoch
           !       transitCounter=0
@@ -5193,7 +5223,7 @@ end if
               CALL NULLIFY(obsy)
               CALL NULLIFY(obsy_ccoord)
               CALL NULLIFY(satellite_ccoord)
-    
+ 
            END DO
             write(0,*) "There was a total of", numberOfTransits, "transits."
     CASE ("geo")
@@ -6563,6 +6593,10 @@ end if
   INTEGER :: sot, N2, i, j, k, l, ncol1, ncol2, ig, s, t, u
   !CHARACTER(LEN=*) :: errstr
   LOGICAL, INTENT(INOUT) :: error1
+  write(0,*) "inra:", inra
+  write(0,*) "indec:", indec
+  write(0,*) "intime:", intime
+  write(0,*) "covrandom:", covrandom
 
   sot=SIZE(inra)
   IF (sot .EQ. 0) THEN
@@ -6666,6 +6700,8 @@ end if
   lambdaqi=0.0_bp
   lambdaqi=matinv(lambdaq1, errstr, "Cholesky")
       IF (LEN_TRIM(errstr) /= 0) THEN
+      write(0, *) lambdaqi
+
          error = .TRUE.
          CALL errorMessage("Observations / collapseTransit", &
               "From matinv in linal: " // TRIM(errstr), 1)
