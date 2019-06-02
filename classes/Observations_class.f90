@@ -5039,6 +5039,12 @@ end if
               END IF
               last_epoch = epoch
               IF (transit_ok) THEN
+              if (transitCounter == 0) then
+                completed = .TRUE. 
+                WRITE(0,*) "Transit with zero observations detected. Assuming that the reading is complete.."
+                Write(0,*) "There were", numberOfTransits, "transits."
+                exit 
+              end if 
               numberOfTransits=numberOfTransits+1
                 init = .TRUE.
                 write(0,*) "This transit has", transitCounter, " obs."
@@ -5050,6 +5056,7 @@ end if
                 if (transitCounter > 9) THEN 
                 write(0,*) "AAAAAH! TRANSIT DETECTION FAILED!"
 end if
+        
                  ! collapseTransit
              !   transitCounter = transitCounter - 1
 
