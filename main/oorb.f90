@@ -1019,6 +1019,7 @@ PROGRAM oorb
   IF (LEN_TRIM(orb_out_fname) == 0) THEN
      lu_orb_out = stdout
   ELSE
+     out_fname = orb_out_fname
      CALL NEW(orb_out_file,TRIM(orb_out_fname))
      CALL OPEN(orb_out_file)
      IF (error) THEN
@@ -1028,6 +1029,7 @@ PROGRAM oorb
      END IF
      lu_orb_out = getUnit(orb_out_file)
   END IF
+
 
   ! Output orbit(s)/ephemerides/etc written into separate files for
   ! each object (overrides --orb-out)
