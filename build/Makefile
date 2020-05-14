@@ -35,7 +35,7 @@ clean:
 	rm -f ../lib/liboorb.{$(LIBEXT),a}
 	rm -rf *.pyf ../python/pyoorb.{so,dylib} ../python/pyoorb.*.so ../python/pyoorb.{name,sp_dir} _pyoorb_build
 	rm -rf ../bin ../lib
-	find .. -name '*.gcno' -o -name '*.gcda' -o -name '*.gcov' -exec rm {} \;
+	find .. -name '*.gcno' -o -name '*.gcov' -exec rm {} \;
 
 #
 # Convenience so we can run 'make oorb' (instead of 'make ../bin/oorb')
