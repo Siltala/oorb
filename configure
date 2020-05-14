@@ -194,6 +194,10 @@ elif [[ $1 == gfortran ]] ; then
     echo 'FC = $(FC_GFORTRAN)' > $include_file
     if [[ $2 == opt ]] ; then
 	echo 'FCOPTIONS = $(FCOPTIONS_OPT_GFORTRAN)'"$ADDOPTS" >> $include_file
+    elif [[ $2 == fdo_profile ]] ; then
+	echo 'FCOPTIONS = $(FCOPTIONS_OPT_GFORTRAN)' "-fprofile-generate" "$ADDOPTS" >> $include_file
+    elif [[ $2 == fdo_build ]] ; then
+	echo 'FCOPTIONS = $(FCOPTIONS_OPT_GFORTRAN)' "-fprofile-use" "$ADDOPTS" >> $include_file
     else
 	echo 'FCOPTIONS = $(FCOPTIONS_DEB_GFORTRAN)'"$ADDOPTS" >> $include_file
     fi
