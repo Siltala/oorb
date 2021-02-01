@@ -95,7 +95,6 @@ jobs:
       run: |
         pip3 install -U pytest numpy
         brew reinstall gcc
-        #         brew install gfortran
         ./configure gfortran opt --with-pyoorb --with-python=python3
         make -j3
     - name: Build ephemerides
