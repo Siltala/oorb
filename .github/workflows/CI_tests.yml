@@ -94,7 +94,8 @@ jobs:
     - name: Compile oorb with gfortran
       run: |
         pip3 install -U pytest numpy
-         brew install gfortran
+        brew reinstall gcc
+        #         brew install gfortran
         ./configure gfortran opt --with-pyoorb --with-python=python3
         make -j3
     - name: Build ephemerides
