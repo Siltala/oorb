@@ -200,6 +200,8 @@ jobs:
     if: github.event_name == 'release' && github.event.action == 'published'
     permissions:
       id-token: write
+    environment:
+      url: https://pypi.org/p/pyoorb-test
     steps:
     - uses: actions/download-artifact@v3
       with:
